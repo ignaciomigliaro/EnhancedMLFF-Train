@@ -1,7 +1,6 @@
 import os
 import logging
 import torch
-from your_project.cli import parse_args
 from your_project.config_loader import get_configurations
 from your_project.mace_calc import MaceCalc
 from your_project.utils import (
