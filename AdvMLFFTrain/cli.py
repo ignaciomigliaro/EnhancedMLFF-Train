@@ -1,7 +1,7 @@
 import logging
-from AdvancedMLFFTrain.utils import parse_args
-from AdvancedMLFFTrain.active_learning import ActiveLearning
-from AdvancedMLFFTrain.data_reduction import DataReduction
+from AdvMLFFTrain.utils import parse_args
+from AdvMLFFTrain.active_learning import ActiveLearning
+from AdvMLFFTrain.data_reduction import DataReduction
 
 def main():
     """Runs the selected pipeline based on user input."""

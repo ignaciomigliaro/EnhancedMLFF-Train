@@ -1,4 +1,4 @@
-# AdvancedMLFFTrain/__init__.py
+# AdvMLFFTrain/__init__.py
 import os
 
 CONFIG = {
