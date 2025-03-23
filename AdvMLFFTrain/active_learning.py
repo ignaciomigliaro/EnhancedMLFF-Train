@@ -1,14 +1,9 @@
-import os
+MaceCalcimport os
 import logging
 import torch
-from your_project.config_loader import get_configurations
-from your_project.mace_calc import MaceCalc
-from your_project.utils import (
-    filter_high_deviation_structures,
-    plot_std_dev_distribution,
-    calculate_std_dev
-)
-from your_project.dft_input import ActiveLearningDFT
+from AdvMLFFTrain.config_loader import get_configurations
+from AdvMLFFTrain.mace_calc import MaceCalc
+from AdvMLFFTrain.dft_input import ActiveLearningDFT
 
 class ActiveLearning:
     """Handles the active learning pipeline for MACE MLFF models."""
