@@ -74,4 +74,4 @@ class MaceCalc:
             energies.append(atoms.info["mace_energy"])
             forces.append(atoms.info["mace_forces"])
 
-        return energies, forces
+        return atoms_list
