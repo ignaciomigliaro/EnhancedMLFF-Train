@@ -64,7 +64,7 @@ def get_configurations(filepath, stepsize=1, use_dft_energy=False, dft_energy_fi
 
     return configurations
 
-def parse_orca_to_ase(file_path):
+def parse_test(file_path):
     """
     Parses an ORCA output file and returns an ASE Atoms object with:
     - Atomic symbols
@@ -138,8 +138,8 @@ def parse_orca_to_ase(file_path):
         # Convert lists to numpy arrays, ensuring they are never None
         positions = np.array(positions) if positions else np.array([])
         forces = np.array(forces) * 51.422 if forces else np.array([])  # Convert Hartree/Bohr to eV/Å
-
         # Debugging print: Check lengths
+        print(f"Positions: {len(positions) if positions.size else 0} | Forces: {len(forces) if forces.size else 0}")
 
         # Validate if element and position lists are the same length
         if len(elements) != len(positions):
@@ -150,12 +150,12 @@ def parse_orca_to_ase(file_path):
 
         # Attach energy and forces
         if energy is not None:
-            atoms.info['dft_energy'] = energy
+            atoms.info['energy'] = energy
 
         # Ensure forces are added even if there’s a mismatch
-        if forces.size > 0 and len(forces) == len(positions):
-            atoms.arrays['dft_forces'] = forces
+        if forces.size > 0:
+            atoms.info['forces'] = forces
         else:
-            print(f"⚠️ Warning: No forces extracted or mismatch in count for {file_path}")
+            print(f"Warning: No forces extracted or mismatch in count for {file_path}")
 
         return atoms
