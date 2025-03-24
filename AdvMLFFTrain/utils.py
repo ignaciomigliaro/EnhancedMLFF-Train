@@ -2,6 +2,8 @@ import argparse
 import os
 import logging
 from ase.io import read
+import numpy as np 
+from ase import Atoms
 
 def parse_args():
     """Parses command-line arguments for both active learning and data reduction."""
@@ -106,12 +108,19 @@ def parse_orca_to_ase(file_path):
 
         # Extract Cartesian gradients (forces in Hartree/Bohr)
         in_forces_section = False
+        skip_lines = 2  # Number of lines to skip after "CARTESIAN GRADIENT"
+
         for line in lines:
             if "CARTESIAN GRADIENT" in line:
                 in_forces_section = True
-                continue  # Skip the header line
+                skip_lines = 2  # Reset the skip counter
+                continue
 
             if in_forces_section:
+                if skip_lines > 0:
+                    skip_lines -= 1  # Skip the next two lines
+                    continue
+
                 if line.strip() == "":  # Stop when a blank line is encountered
                     break
                 
@@ -131,7 +140,6 @@ def parse_orca_to_ase(file_path):
         forces = np.array(forces) * 51.422 if forces else np.array([])  # Convert Hartree/Bohr to eV/Å
 
         # Debugging print: Check lengths
-        print(f"Positions: {len(positions) if positions.size else 0} | Forces: {len(forces) if forces.size else 0}")
 
         # Validate if element and position lists are the same length
         if len(elements) != len(positions):
@@ -142,11 +150,11 @@ def parse_orca_to_ase(file_path):
 
         # Attach energy and forces
         if energy is not None:
-            atoms.info['energy'] = energy
+            atoms.info['dft_energy'] = energy
 
         # Ensure forces are added even if there’s a mismatch
         if forces.size > 0 and len(forces) == len(positions):
-            atoms.arrays['forces'] = forces
+            atoms.arrays['dft_forces'] = forces
         else:
             print(f"⚠️ Warning: No forces extracted or mismatch in count for {file_path}")
 
