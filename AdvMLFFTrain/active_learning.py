@@ -1,7 +1,7 @@
 import logging
 import torch
 from AdvMLFFTrain.mace_calc import MaceCalc
-from AdvMLFFTrain.dft_input import dft_input
+from AdvMLFFTrain.dft_input import DFTInputGenerator
 from AdvMLFFTrain.utils import get_configurations
 import os
 import matplotlib.pyplot as plt
