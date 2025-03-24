@@ -2,7 +2,7 @@ import logging
 import torch
 from AdvMLFFTrain.mace_calc import MaceCalc
 from AdvMLFFTrain.dft_input import DFTInputGenerator
-from AdvMLFFTrain.utils import get_configurations
+from AdvMLFFTrain.utils import get_configurations, parse_orca_to_ase
 import os
 import matplotlib.pyplot as plt
 import numpy as np
@@ -58,8 +58,14 @@ class ActiveLearning:
         plt.show()
 
     def load_data(self):
-        """Loads configurations and models."""
-        self.atoms_list = get_configurations(self.args.filepath, self.args.stepsize)
+        """Loads configurations and models, including ORCA output parsing if applicable."""
+        
+        if self.args.filepath.endswith(".out"):  # ORCA output file detected
+            logging.info(f"Parsing ORCA output file: {self.args.filepath}")
+            self.atoms_list = [parse_orca_to_ase(self.args.filepath)]  # Parse into a single ASE Atoms object
+        else:
+            self.atoms_list = get_configurations(self.args.filepath, self.args.stepsize)
+        
         logging.info(f"Loaded {len(self.atoms_list)} configurations.")
 
         self.mace_calc = MaceCalc(self.args.model_dir, self.device)
