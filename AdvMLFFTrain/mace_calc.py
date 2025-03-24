@@ -2,6 +2,7 @@ import os
 import logging
 from mace.calculators import MACECalculator
 from ase import Atoms
+import copy
 
 class MaceCalc:
     """Handles loading MACE models and performing energy & force calculations."""
@@ -38,40 +39,40 @@ class MaceCalc:
     def calculate_energy_forces(self, atoms_list):
         """
         Calculates total energy and forces for each configuration using all available MACE models.
+        Stores the calculated values inside atoms.info.
 
         Parameters:
         - atoms_list (list): List of ASE Atoms objects.
 
         Returns:
-        - tuple: (list of computed energies, list of computed forces)
+        - list: Modified list of ASE Atoms objects with updated "mace_energy" and "mace_forces" in atoms.info.
         """
         if not self.models:
             logging.error("No MACE models loaded. Cannot perform calculations.")
-            return None, None
+            return None
 
-        energies = []
-        forces = []
-        for atoms in atoms_list:
+        for i, atoms in enumerate(atoms_list):
+            atoms_copy = copy.deepcopy(atoms)  # Create a copy to avoid modifying the original during calculation
             model_energies = []
             model_forces = []
+
             for model_path in self.models:
                 try:
                     calc = MACECalculator(model_paths=[model_path], device=self.device)
-                    atoms.set_calculator(calc)
+                    atoms_copy.set_calculator(calc)
 
-                    energy = atoms.get_total_energy()
-                    force = atoms.get_forces()
+                    energy = atoms_copy.get_potential_energy()  # Updated method
+                    force = atoms_copy.get_forces()
 
                     model_energies.append(energy)
                     model_forces.append(force)
                 except Exception as e:
                     logging.error(f"Error calculating energy/forces with model {model_path}: {e}")
+                    model_energies.append(None)
+                    model_forces.append(None)
 
-            # Store results in atoms.info
+            # Store results in original atoms.info
             atoms.info["mace_energy"] = model_energies if self.num_models > 1 else model_energies[0]
             atoms.info["mace_forces"] = model_forces if self.num_models > 1 else model_forces[0]
 
-            energies.append(atoms.info["mace_energy"])
-            forces.append(atoms.info["mace_forces"])
-
-        return atoms_list
+        return atoms_list  # Returning modified atoms_list

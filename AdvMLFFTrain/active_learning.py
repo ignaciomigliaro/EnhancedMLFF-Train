@@ -5,6 +5,7 @@ from AdvMLFFTrain.mace_calc import MaceCalc
 from AdvMLFFTrain.dft_input import dft_input
 import os
 import matplotlib.pyplot as plt
+import numpy as np
 
 class ActiveLearning:
     """Handles the active learning pipeline for MACE MLFF models."""
@@ -63,7 +64,70 @@ class ActiveLearning:
 
         self.mace_calc = MaceCalc(self.args.model_dir, self.device)
         logging.info(f"Models loaded: {len(self.mace_calc.models)}")
+    
+    def calculate_std_dev(atoms_list, cache_file=None):
+        """
+        Calculate the standard deviation of energies and forces across different MACE models.
+        
+        Parameters:
+        - atoms_list (list): List of ASE Atoms objects with precomputed energy and force values in atoms.info.
+        - cache_file (str, optional): Path to a file where the computed data will be cached.
 
+        Returns:
+        - std_dev (list): Standard deviation of energies for each configuration.
+        - std_dev_forces (list): Standard deviation of forces for each configuration.
+        - energy_values (list): List of energy values for each configuration.
+        - force_values (list): List of force values for each configuration.
+        """
+        if not atoms_list:
+            logging.error("Empty atoms_list provided. Cannot calculate standard deviations.")
+            return None, None, None, None
+
+        num_configs = len(atoms_list)
+        energies = []
+        forces = []
+
+        progress = tqdm(total=num_configs, desc="Processing Energies and Forces")
+
+        # Collect energies and forces from atoms.info
+        for atoms in atoms_list:
+            try:
+                energy = atoms.info.get("mace_energy", None)
+                force = atoms.info.get("mace_forces", None)
+
+                if energy is not None and force is not None:
+                    energies.append(energy)
+                    forces.append(np.array(force).flatten())
+                else:
+                    logging.warning(f"Missing energy or force data in atoms.info for {atoms}. Skipping entry.")
+
+            except Exception as e:
+                logging.error(f"Error retrieving energy/forces from atoms.info: {e}")
+            
+            progress.update(1)
+
+        # Convert to NumPy arrays
+        energies_array = np.array(energies)
+        forces_array = np.array(forces)
+
+        # Compute standard deviation of energies
+        std_dev = np.std(energies_array, axis=0).tolist()  # Standard deviation across models
+
+        # Compute standard deviation of forces
+        std_dev_forces = np.std(forces_array, axis=0).tolist()  # Standard deviation across models
+
+        # Cache results if requested
+        if cache_file:
+            data_to_save = {
+                'energy_values': energies_array.tolist(),
+                'force_values': forces_array.tolist(),
+                'std_dev': std_dev,
+                'std_dev_forces': std_dev_forces
+            }
+            save_to_cpu_pickle(data_to_save, cache_file)  # Save results
+
+        return std_dev, std_dev_forces, energies_array.tolist(), forces_array.tolist()
+    
     def calculate_energies_forces(self):
         """Assigns calculators and computes energies & forces."""
         logging.info(f"Running calculations on {len(self.atoms_list)} configurations.")
@@ -177,8 +241,8 @@ class ActiveLearning:
         """Executes the entire Active Learning pipeline."""
         self.load_data()
         atoms_list = self.calculate_energies_forces()
-        #calculate std_dev
-        self.filter_structures(std_dev, mean_abs_deviation)
+        std_dev, std_dev_forces =self.calculate_std_dev(atoms_list)
+        self.filter_structures(std_dev, std_dev_forces)
         self.generate_dft_inputs()
         #submit dft_inputs
         #parse dft_inputs
