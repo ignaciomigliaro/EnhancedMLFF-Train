@@ -58,93 +58,94 @@ class ActiveLearning:
         plt.show()
 
     def load_data(self):
-        """Loads configurations and models, including ORCA output parsing if applicable."""
+        """Loads configurations using ASE-supported formats and initializes MACE models."""
         
-        if self.args.filepath.endswith(".out"):  # ORCA output file detected
-            logging.info(f"Parsing ORCA output file: {self.args.filepath}")
-            self.atoms_list = [parse_orca_to_ase(self.args.filepath)]  # Parse into a single ASE Atoms object
-        else:
-            self.atoms_list = get_configurations(self.args.filepath, self.args.stepsize)
-        
+        logging.info(f"Loading configurations from {self.args.filepath} using ASE.")
+
+        # Load configurations using ASE-supported formats
+        self.atoms_list = get_configurations(
+            self.args.filepath, 
+            self.args.stepsize, 
+            use_dft_energy=self.args.use_dft_energy, 
+            dft_energy_file=self.args.dft_energy_file
+        )
+
         logging.info(f"Loaded {len(self.atoms_list)} configurations.")
-
-        self.mace_calc = MaceCalc(self.args.model_dir, self.device)
-        logging.info(f"Models loaded: {len(self.mace_calc.models)}")
-    
-    def calculate_std_dev(atoms_list, cache_file=None):
-        """
-        Calculate the standard deviation of energies and forces across different MACE models.
-        
-        Parameters:
-        - atoms_list (list): List of ASE Atoms objects with precomputed energy and force values in atoms.info.
-        - cache_file (str, optional): Path to a file where the computed data will be cached.
-
-        Returns:
-        - std_dev (list): Standard deviation of energies for each configuration.
-        - std_dev_forces (list): Standard deviation of forces for each configuration.
-        - energy_values (list): List of energy values for each configuration.
-        - force_values (list): List of force values for each configuration.
-        """
-        if not atoms_list:
-            logging.error("Empty atoms_list provided. Cannot calculate standard deviations.")
-            return None, None, None, None
-
-        num_configs = len(atoms_list)
-        energies = []
-        forces = []
-
-        progress = tqdm(total=num_configs, desc="Processing Energies and Forces")
-
-        # Collect energies and forces from atoms.info
-        for atoms in atoms_list:
-            try:
-                energy = atoms.info.get("mace_energy", None)
-                force = atoms.info.get("mace_forces", None)
-
-                if energy is not None and force is not None:
-                    energies.append(energy)
-                    forces.append(np.array(force).flatten())
-                else:
-                    logging.warning(f"Missing energy or force data in atoms.info for {atoms}. Skipping entry.")
-
-            except Exception as e:
-                logging.error(f"Error retrieving energy/forces from atoms.info: {e}")
-            
-            progress.update(1)
-
-        # Convert to NumPy arrays
-        energies_array = np.array(energies)
-        forces_array = np.array(forces)
-
-        # Compute standard deviation of energies
-        std_dev = np.std(energies_array, axis=0).tolist()  # Standard deviation across models
-
-        # Compute standard deviation of forces
-        std_dev_forces = np.std(forces_array, axis=0).tolist()  # Standard deviation across models
-
-        # Cache results if requested
-        if cache_file:
-            data_to_save = {
-                'energy_values': energies_array.tolist(),
-                'force_values': forces_array.tolist(),
-                'std_dev': std_dev,
-                'std_dev_forces': std_dev_forces
-            }
-            save_to_cpu_pickle(data_to_save, cache_file)  # Save results
-
-        return std_dev, std_dev_forces, energies_array.tolist(), forces_array.tolist()
     
     def calculate_energies_forces(self):
-        """Assigns calculators and computes energies & forces."""
-        logging.info(f"Running calculations on {len(self.atoms_list)} configurations.")
-        _, mean_abs_deviation, std_dev, _ = calculate_std_dev(self.atoms_list, cache_file=self.use_cache)
-        logging.info(f"Standard deviations calculated for {len(std_dev)} atoms.")
+        """Assigns MACE calculators and computes energies & forces."""
+        
+        logging.info(f"Running MACE calculations on {len(self.atoms_list)} configurations.")
 
-        if self.plot_std_dev:
-            plot_std_dev_distribution(std_dev)
+        # Compute energies and forces using MACE
+        self.atoms_list = self.mace_calc.calculate_energy_forces(self.atoms_list)
 
-        return std_dev, mean_abs_deviation
+        # Check if calculations were successful
+        if not self.atoms_list or any("mace_energy" not in atoms.info or "mace_forces" not in atoms.info for atoms in self.atoms_list):
+            logging.error("MACE calculations failed for some or all configurations.")
+            return
 
+    logging.info("Successfully computed energies and forces with MACE.")
+
+    def calculate_std_dev(self):
+    """Computes standard deviation of energies and forces after MACE calculations."""
+    
+    logging.info("Calculating standard deviations for energies and forces.")
+
+    if not self.atoms_list:
+        logging.error("No configurations available to compute standard deviation.")
+        return
+
+    num_configs = len(self.atoms_list)
+    energies = []
+    forces = []
+
+    progress = tqdm(total=num_configs, desc="Processing Energies and Forces")
+
+    for atoms in self.atoms_list:
+        try:
+            energy = atoms.info.get("mace_energy", None)
+            force = atoms.info.get("mace_forces", None)
+
+            if energy is not None and force is not None:
+                energies.append(energy)
+                forces.append(np.array(force).flatten())
+            else:
+                logging.warning(f"Missing energy or force data in atoms.info for {atoms}. Skipping entry.")
+
+        except Exception as e:
+            logging.error(f"Error retrieving energy/forces from atoms.info: {e}")
+
+        progress.update(1)
+
+    progress.close()
+
+    # Convert to NumPy arrays
+    energies_array = np.array(energies)
+    forces_array = np.array(forces)
+
+    # Compute standard deviation of energies
+    std_dev = np.std(energies_array, axis=0).tolist() if len(energies) > 1 else [0] * len(energies)
+    
+    # Compute standard deviation of forces
+    std_dev_forces = np.std(forces_array, axis=0).tolist() if len(forces) > 1 else [0] * len(forces)
+
+    logging.info(f"Standard deviations calculated for {num_configs} configurations.")
+
+    # Cache results if needed
+    if self.use_cache:
+        data_to_save = {
+            'energy_values': energies_array.tolist(),
+            'force_values': forces_array.tolist(),
+            'std_dev': std_dev,
+            'std_dev_forces': std_dev_forces
+        }
+        save_to_cpu_pickle(data_to_save, self.use_cache)  # Save results
+
+    # Plot distribution of standard deviations if requested
+    if self.plot_std_dev:
+        plot_std_dev_distribution(std_dev)
+        
     def filter_high_deviation_structures(atoms_lists, std_dev, user_threshold=None, lower_threshold=None, percentile=90):
         """
         Filters structures based on the normalized standard deviation.
@@ -246,8 +247,8 @@ class ActiveLearning:
     def run(self):
         """Executes the entire Active Learning pipeline."""
         self.load_data()
-        atoms_list = self.calculate_energies_forces()
-        std_dev, std_dev_forces =self.calculate_std_dev(atoms_list)
+        self.calculate_energies_forces()
+        std_dev, std_dev_forces = self.calculate_std_dev()
         self.filter_structures(std_dev, std_dev_forces)
         #TODO self.generate_dft_inputs()
         #TODO submit dft_inputs
