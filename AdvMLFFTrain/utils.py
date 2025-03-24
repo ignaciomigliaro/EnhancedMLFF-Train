@@ -57,11 +57,7 @@ def get_configurations(filepath, stepsize=1, use_dft_energy=False, dft_energy_fi
     # If Data Reduction, get DFT energies
     if use_dft_energy and dft_energy_file:
         logging.info(f"Loading DFT energies from {dft_energy_file}")
-        with open(dft_energy_file, "r") as f:
-            dft_energies = {line.split()[0]: float(line.split()[1]) for line in f}
-        for atoms in configurations:
-            atoms.info["dft_energy"] = dft_energies.get(atoms.info.get("id"), None)
-
+        #TODO add energy data for data reduction
     return configurations
 
 def parse_orca_to_ase(file_path):

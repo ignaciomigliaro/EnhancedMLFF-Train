@@ -3,6 +3,9 @@ import logging
 from mace.calculators import MACECalculator
 from ase import Atoms
 import copy
+from tqdm import tqdm
+import torch
+torch.set_default_dtype(torch.float64)
 
 class MaceCalc:
     """Handles loading MACE models and performing energy & force calculations."""
@@ -19,6 +22,9 @@ class MaceCalc:
         self.device = device
         self.models = self.load_models()
         self.num_models = len(self.models)  # Automatically determine number of models
+
+        if self.num_models == 0:
+            logging.error(f"No MACE models found in {self.model_dir}. Check the directory path.")
 
     def load_models(self):
         """
@@ -51,6 +57,8 @@ class MaceCalc:
             logging.error("No MACE models loaded. Cannot perform calculations.")
             return None
 
+        progress_bar = tqdm(total=len(atoms_list), desc="Calculating MACE Energies & Forces")
+
         for i, atoms in enumerate(atoms_list):
             atoms_copy = copy.deepcopy(atoms)  # Create a copy to avoid modifying the original during calculation
             model_energies = []
@@ -58,10 +66,10 @@ class MaceCalc:
 
             for model_path in self.models:
                 try:
-                    calc = MACECalculator(model_paths=[model_path], device=self.device)
-                    atoms_copy.set_calculator(calc)
+                    calc = MACECalculator(model_paths=[model_path], device=self.device, dtype=torch.float64)
+                    atoms_copy.calc = calc
 
-                    energy = atoms_copy.get_potential_energy()  # Updated method
+                    energy = atoms_copy.get_potential_energy()
                     force = atoms_copy.get_forces()
 
                     model_energies.append(energy)
@@ -75,4 +83,8 @@ class MaceCalc:
             atoms.info["mace_energy"] = model_energies if self.num_models > 1 else model_energies[0]
             atoms.info["mace_forces"] = model_forces if self.num_models > 1 else model_forces[0]
 
-        return atoms_list  # Returning modified atoms_list
+            progress_bar.update(1)  # Update progress bar
+
+        progress_bar.close()  # Close progress bar when done
+
+        return atoms_list
