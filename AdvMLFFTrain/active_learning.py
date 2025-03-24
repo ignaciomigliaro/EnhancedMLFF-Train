@@ -243,9 +243,9 @@ class ActiveLearning:
         atoms_list = self.calculate_energies_forces()
         std_dev, std_dev_forces =self.calculate_std_dev(atoms_list)
         self.filter_structures(std_dev, std_dev_forces)
-        self.generate_dft_inputs()
-        #submit dft_inputs
-        #parse dft_inputs
-        #retrain mlff
-        #re-run
+        #TODO self.generate_dft_inputs()
+        #TODO submit dft_inputs
+        #TODO parse dft_inputs
+        #TODO retrain mlff
+        #TODO re-run
         logging.info("Active Learning process completed.")
