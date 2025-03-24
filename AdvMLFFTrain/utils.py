@@ -64,7 +64,7 @@ def get_configurations(filepath, stepsize=1, use_dft_energy=False, dft_energy_fi
 
     return configurations
 
-def parse_test(file_path):
+def parse_orca_to_ase(file_path):
     """
     Parses an ORCA output file and returns an ASE Atoms object with:
     - Atomic symbols
