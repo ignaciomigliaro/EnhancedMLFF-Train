@@ -56,7 +56,7 @@ class ActiveLearning:
                 )
 
             logging.info(f"Initialized MACE calculator with {self.mace_calc.num_models} models from {self.args.model_dir}.")
-            
+
     def plot_std_dev_distribution(std_devs):
         """
         Plots the distribution of standard deviations using a histogram.
@@ -85,7 +85,7 @@ class ActiveLearning:
         )
 
         logging.info(f"Loaded {len(self.atoms_list)} configurations.")
-    
+
     def calculate_energies_forces(self):
         """Assigns MACE calculators and computes energies & forces."""
         
@@ -99,7 +99,7 @@ class ActiveLearning:
             logging.error("MACE calculations failed for some or all configurations.")
             return
 
-    logging.info("Successfully computed energies and forces with MACE.")
+        logging.info("Successfully computed energies and forces with MACE.")
 
     def calculate_std_dev(self):
         """Computes standard deviation of energies and forces after MACE calculations."""
@@ -114,8 +114,6 @@ class ActiveLearning:
         energies = []
         forces = []
 
-        progress = tqdm(total=num_configs, desc="Processing Energies and Forces")
-
         for atoms in self.atoms_list:
             try:
                 energy = atoms.info.get("mace_energy", None)
@@ -129,10 +127,6 @@ class ActiveLearning:
 
             except Exception as e:
                 logging.error(f"Error retrieving energy/forces from atoms.info: {e}")
-
-            progress.update(1)
-
-        progress.close()
 
         # Convert to NumPy arrays
         energies_array = np.array(energies)

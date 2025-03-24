@@ -1,11 +1,16 @@
 import os
 import logging
+import warnings
 from mace.calculators import MACECalculator
+warnings.filterwarnings("ignore", message=".*torch.load received a zip file.*")  
 from ase import Atoms
 import copy
 from tqdm import tqdm
 import torch
+
 torch.set_default_dtype(torch.float64)
+
+
 
 class MaceCalc:
     """Handles loading MACE models and performing energy & force calculations."""
@@ -66,7 +71,7 @@ class MaceCalc:
 
             for model_path in self.models:
                 try:
-                    calc = MACECalculator(model_paths=[model_path], device=self.device, dtype=torch.float64)
+                    calc = MACECalculator(model_paths=[model_path], device=self.device, default_dtype="float64")
                     atoms_copy.calc = calc
 
                     energy = atoms_copy.get_potential_energy()
