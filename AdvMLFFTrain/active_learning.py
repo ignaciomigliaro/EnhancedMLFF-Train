@@ -25,12 +25,11 @@ class ActiveLearning:
         self.output_dir = args.output_dir
         self.dft_software = args.dft_software
         self.eval_criteria = args.eval_criteria
-        self.upper_threshold = args.threshold
+        self.upper_threshold = args.upper_threshold
         self.lower_threshold = args.lower_threshold
         self.use_cache = args.use_cache
         self.plot_std_dev = args.plot_std_dev
-        self.atoms_list = []
-        self.filtered_atoms_list = []
+        self.sample_percentage = args.sample_percentage
 
         os.makedirs(self.output_dir, exist_ok=True)
 
@@ -81,20 +80,21 @@ class ActiveLearning:
         logging.info(f"Loading configurations from {self.args.filepath} using ASE.")
 
         # Load configurations using ASE-supported formats
-        self.atoms_list = get_configurations(
+        sampled_atoms,remaining_atoms = get_configurations(
             self.args.filepath, 
-            self.args.stepsize, 
+            self.args.sample_percentage, 
         )
 
-        logging.info(f"Loaded {len(self.atoms_list)} configurations.")
+        logging.info(f"Loaded {len(sampled_atoms)} configurations.")
+        return sampled_atoms, remaining_atoms
 
-    def calculate_energies_forces(self):
+    def calculate_energies_forces(self,sampled_atoms):
         """Assigns MACE calculators and computes energies & forces."""
         
         logging.info(f"Running MACE calculations on {len(self.atoms_list)} configurations.")
 
         # Compute energies and forces using MACE
-        self.atoms_list = self.mace_calc.calculate_energy_forces(self.atoms_list)
+        sampled_atoms = self.mace_calc.calculate_energy_forces(sampled_atoms)
 
         # Check if calculations were successful
         if not self.atoms_list or any("mace_energy" not in atoms.info or "mace_forces" not in atoms.info for atoms in self.atoms_list):
@@ -103,69 +103,56 @@ class ActiveLearning:
 
         logging.info("Successfully computed energies and forces with MACE.")
 
-    def calculate_std_dev(self, cache_file=None):
+    def calculate_std_dev(self, sampled_atoms):
         """
-        Calculate the standard deviation of energies and mean absolute deviation of forces
-        for each configuration in the active learning set.
+        Calculate the standard deviation of energies and forces for each atomic configuration
+        in the active learning set (Query by Committee).
 
         Parameters:
         - cache_file (str, optional): Path to save computed energy values, forces, and deviations.
 
         Returns:
-        - std_dev (list): Standard deviation of energies for each configuration.
-        - mean_abs_deviation (list): Mean absolute deviation of forces for each atom in a configuration.
+        - std_energy (list): Standard deviation of energies per configuration.
+        - std_dev_forces (list): Standard deviation of forces per atom in each configuration.
+        - energy_values (list): Computed energy values.
+        - force_values (list): Computed force values.
         """
         
         logging.info("Calculating standard deviations for energies and forces.")
 
-        if not self.atoms_list:
+        if not sampled_atoms:
             logging.error("No configurations available to compute standard deviation.")
             return None, None, None, None
 
         std_energy = []
-        mean_abs_deviation = []
+        std_dev_forces = []
 
-        progress = tqdm(total=len(self.atoms_list), desc="Processing Energies and Forces")
+        progress = tqdm(total=len(sampled_atoms), desc="Processing Energies and Forces")
 
-        for atoms in self.atoms_list:
-            # Extract energy values for each model
+        for atoms in sampled_atoms:
+            # Extract energy values from different models
             energy_values = atoms.info["mace_energy"]  # Should be a list of 3 values (one per model)
-            std_energy.append(np.std(energy_values))
+            std_energy.append(np.std(energy_values))  # Compute standard deviation of energies
 
-            # Extract forces (should be shape (3, N_atoms, 3))
+            # Extract forces from different models
             force_values = np.array(atoms.info["mace_forces"])  # Shape: (3, N_atoms, 3)
 
-            # Compute mean absolute deviation of forces
-            abs_deviation_values = []
-            num_models = len(force_values)
-            for i in range(num_models):
-                for j in range(i + 1, num_models):
-                    abs_deviation = np.abs(force_values[i] - force_values[j])
-                    abs_deviation_values.append(np.mean(abs_deviation))
+            # Compute standard deviation of forces across models for each atom
+            std_dev_atom_forces = np.std(force_values, axis=0)  # Shape: (N_atoms, 3)
+            std_dev_forces.append(np.mean(std_dev_atom_forces))  # Mean over all atoms and directions
 
-            mean_abs_deviation.append(np.mean(abs_deviation_values))  # Mean across all model comparisons
-            
             progress.update(1)
 
         progress.close()
 
-        self.std_dev = std_energy
-        self.mean_abs_deviation = mean_abs_deviation
+        #self.std_dev = std_energy
+        #self.std_dev_forces = std_dev_forces  # This is now correctly computed
 
         logging.info("Standard deviations calculated for all configurations.")
 
-        # Cache results if requested
-        if cache_file:
-            with open(cache_file, 'wb') as f:
-                pickle.dump({
-                    'std_dev': std_energy,
-                    'mean_abs_deviation': mean_abs_deviation
-                }, f)
+        return std_energy, std_dev_forces
 
-        return std_energy, mean_abs_deviation
-
-
-    def filter_high_deviation_structures(self,percentile=90):
+    def filter_high_deviation_structures(self,std_dev,std_dev_forces,sampled_atoms,percentile=90):
         """
         Filters structures based on the normalized standard deviation.
         Includes structures with normalized deviation within the specified threshold range.
@@ -183,18 +170,17 @@ class ActiveLearning:
         - filtered_std_dev (list of floats): List of standard deviation values corresponding to the filtered structures.
         """
         if self.eval_criteria == 'forces':
-            std_dev = self.std_dev_forces
+            std_dev = std_dev_forces
         if self.eval_criteria == 'energy':
-            std_dev == self.std_dev
-
-        std_dev_normalized = self.std_dev
+            std_dev == std_dev
+        
         if self.upper_threshold and self.lower_threshold is not None:
             logging.info(f"User-defined upper threshold for filtering: {self.upper_threshold}")
         else:
             upper_threshold = np.percentile(std_dev, percentile)
             logging.info(f"Threshold for filtering (95th percentile): {percentile}")
 
-        if lower_threshold is not None:
+        if self.lower_threshold is not None:
             lower_threshold = float(self.lower_threshold)
             logging.info(f"User-defined lower threshold for filtering: {lower_threshold}")
         else:
@@ -206,30 +192,10 @@ class ActiveLearning:
 
         for i, norm_dev in enumerate(std_dev):
             if lower_threshold <= norm_dev <= upper_threshold:  # Include structures within the threshold range
-                filtered_atoms_list.append(self.atoms_lists[0][i])
+                filtered_atoms_list.append(sampled_atoms[0][i])
                 filtered_std_dev.append(norm_dev)
         logging.info(f"Number of structures within threshold range: {len(filtered_atoms_list)}")
-        return filtered_atoms_list, filtered_std_dev
-
-    def filter_structures(self, std_dev, mean_abs_deviation):
-        """Filters structures based on energy or force standard deviation."""
-        logging.info(f"Filtering structures based on {self.eval_criteria} standard deviation.")
-
-        if self.eval_criteria == 'energy':
-            self.filtered_atoms_list, _ = filter_high_deviation_structures(
-                atoms_lists=self.atoms_list,
-                std_dev=std_dev,
-                user_threshold=self.threshold,
-                lower_threshold=self.lower_threshold
-            )
-        elif self.eval_criteria == 'forces':
-            self.filtered_atoms_list, _ = filter_high_deviation_structures(
-                atoms_lists=self.atoms_list,
-                std_dev=mean_abs_deviation,
-                user_threshold=self.threshold,
-                lower_threshold=self.lower_threshold
-            )
-        logging.info(f"Number of filtered structures: {len(self.filtered_atoms_list)}")
+        return filtered_atoms_list
 
     def plot_std_dev_distribution(std_devs):
         """
@@ -269,10 +235,11 @@ class ActiveLearning:
 
     def run(self):
         """Executes the entire Active Learning pipeline."""
-        self.load_data()
-        self.calculate_energies_forces()
-        std_dev, std_dev_forces = self.calculate_std_dev()
-        self.filter_structures(std_dev, std_dev_forces)
+        sampled_atoms, remaining_atoms = self.load_data()
+        sampled_atoms = self.calculate_energies_forces(sampled_atoms)
+        std_dev, std_dev_forces = self.calculate_std_dev(sampled_atoms)
+        filtered_atoms_list = self.filter_high_deviation_structures(std_dev,std_dev_forces,sampled_atoms)
+        
         #TODO self.generate_dft_inputs()
         #TODO submit dft_inputs
         #TODO parse dft_inputs
