@@ -4,6 +4,7 @@ import logging
 from ase.io import read
 import numpy as np 
 from ase import Atoms
+import random
 
 def parse_args():
     """Parses command-line arguments for both active learning and data reduction."""
@@ -14,7 +15,6 @@ def parse_args():
     # Active Learning Pipeline
     al_parser = subparsers.add_parser("active_learning", help="Run active learning pipeline")
     al_parser.add_argument("--filepath", type=str, required=True)
-    al_parser.add_argument("--stepsize", type=int, default=1)
     al_parser.add_argument("--model_dir", type=str, required=True)
     al_parser.add_argument("--calculator", type=str, required=True)
     al_parser.add_argument("--device", type=str, default="cpu")
@@ -39,25 +39,21 @@ def parse_args():
 
     return parser.parse_args()
 
-def get_configurations(filepath, stepsize=1, use_dft_energy=False, dft_energy_file=None):
+def get_configurations(filepath):
     """Reads configurations from input files, optionally including DFT energy data."""
     logging.info(f"Reading configurations from {filepath}...")
 
     if os.path.isfile(filepath):
-        configurations = read(filepath, index="::")[::stepsize]
+        configurations = read(filepath, index=":")
     elif os.path.isdir(filepath):
         configurations = []
         for filename in os.listdir(filepath):
             file_path = os.path.join(filepath, filename)
             if os.path.isfile(file_path):
-                configurations.extend(read(file_path, index="::")[::stepsize])
+                configurations.extend(read(file_path, index=":"))
     else:
         raise ValueError(f"Invalid path: {filepath}")
 
-    # If Data Reduction, get DFT energies
-    if use_dft_energy and dft_energy_file:
-        logging.info(f"Loading DFT energies from {dft_energy_file}")
-        #TODO add energy data for data reduction
     return configurations
 
 def parse_orca_to_ase(file_path):
@@ -155,3 +151,11 @@ def parse_orca_to_ase(file_path):
             print(f"Warning: No forces extracted or mismatch in count for {file_path}")
 
         return atoms
+    
+    def random_sampling(atoms_list, percentage):
+        if not (0 <= percentage <= 100):
+            raise ValueError("Percentage must be between 0 and 100")
+        num_to_sample = int(len(atoms_list) * (percentage / 100))
+        sampled_atoms = random.sample(atoms_list, num_to_sample)
+        remaining_atoms = [atom for atom in atoms_list if atom not in sampled_atoms]
+        return sampled_atoms, remaining_atoms
