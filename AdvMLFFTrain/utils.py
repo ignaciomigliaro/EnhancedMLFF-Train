@@ -25,6 +25,8 @@ def parse_args():
     al_parser.add_argument("--use_cache", type=str)
     al_parser.add_argument("--plot_std_dev", action="store_true")
     al_parser.add_argument("--lower_threshold", type=float)
+    al_parser.add_argument("--upper_threshold", type=float)
+    al_parser.add_argument("--sample_percentage", type=int, required=True)
 
     # Data Reduction Pipeline
     dr_parser = subparsers.add_parser("data_reduction", help="Run data reduction pipeline")
@@ -39,7 +41,16 @@ def parse_args():
 
     return parser.parse_args()
 
-def get_configurations(filepath):
+def random_sampling(atoms_list, percentage):
+        if not (0 <= percentage <= 100):
+            raise ValueError("Percentage must be between 0 and 100")
+        num_to_sample = int(len(atoms_list) * (percentage / 100))
+        sampled_atoms = random.sample(atoms_list, num_to_sample)
+        remaining_atoms = [atom for atom in atoms_list if atom not in sampled_atoms]
+        return sampled_atoms, remaining_atoms
+
+
+def get_configurations(filepath,percentage=10):
     """Reads configurations from input files, optionally including DFT energy data."""
     logging.info(f"Reading configurations from {filepath}...")
 
@@ -53,8 +64,8 @@ def get_configurations(filepath):
                 configurations.extend(read(file_path, index=":"))
     else:
         raise ValueError(f"Invalid path: {filepath}")
-
-    return configurations
+    sampled_atoms, remaining_atoms = random_sampling(configurations, percentage)
+    return sampled_atoms, remaining_atoms
 
 def parse_orca_to_ase(file_path):
     """
@@ -152,10 +163,4 @@ def parse_orca_to_ase(file_path):
 
         return atoms
     
-    def random_sampling(atoms_list, percentage):
-        if not (0 <= percentage <= 100):
-            raise ValueError("Percentage must be between 0 and 100")
-        num_to_sample = int(len(atoms_list) * (percentage / 100))
-        sampled_atoms = random.sample(atoms_list, num_to_sample)
-        remaining_atoms = [atom for atom in atoms_list if atom not in sampled_atoms]
-        return sampled_atoms, remaining_atoms
+    
