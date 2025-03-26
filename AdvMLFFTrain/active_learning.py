@@ -6,8 +6,8 @@ from AdvMLFFTrain.utils import get_configurations, parse_orca_to_ase
 import os
 import matplotlib.pyplot as plt
 import numpy as np
-import pickle
 from tqdm import tqdm
+from filesubmit import Filesubmit
 
 class ActiveLearning:
     """Handles the active learning pipeline for MACE MLFF models."""
@@ -31,7 +31,6 @@ class ActiveLearning:
         self.use_cache = args.use_cache
         self.plot_std_dev = args.plot_std_dev
         self.sample_percentage = args.sample_percentage
-
         os.makedirs(self.output_dir, exist_ok=True)
 
         logging.info(f"Using calculator: {self.calculator}")
@@ -234,7 +233,17 @@ class ActiveLearning:
     )
         return dft_input.generate_dft_inputs(atoms_list)
 
-    
+    def launch_dft_calcs(self):
+        """
+        Launch DFT calculations using the generated input files.
+
+        Parameters:
+        - input_files (list): List of input file paths.
+        """
+        # Launch DFT calculations using the generated input files
+        submitter = Filesubmit(self.job_dir)
+        submitter.run_all_jobs(max_concurrent=15)
+
     def run(self):
         """Executes the entire Active Learning pipeline."""
         sampled_atoms, remaining_atoms = self.load_data()
@@ -242,7 +251,7 @@ class ActiveLearning:
         std_dev, std_dev_forces = self.calculate_std_dev(sampled_atoms)
         filtered_atoms_list = self.filter_high_deviation_structures(std_dev,std_dev_forces,sampled_atoms)
         self.generate_dft_inputs(filtered_atoms_list)
-        #TODO submit dft_inputs
+        self.launch_dft_calcs()
         #TODO parse dft_inputs
         #TODO retrain mlff
         #TODO re-run
