@@ -91,17 +91,19 @@ class ActiveLearning:
     def calculate_energies_forces(self,sampled_atoms):
         """Assigns MACE calculators and computes energies & forces."""
         
-        logging.info(f"Running MACE calculations on {len(self.atoms_list)} configurations.")
+        logging.info(f"Running MACE calculations on {len(sampled_atoms)} configurations.")
 
         # Compute energies and forces using MACE
         sampled_atoms = self.mace_calc.calculate_energy_forces(sampled_atoms)
 
         # Check if calculations were successful
-        if not self.atoms_list or any("mace_energy" not in atoms.info or "mace_forces" not in atoms.info for atoms in self.atoms_list):
+        if not sampled_atoms or any("mace_energy" not in atoms.info or "mace_forces" not in atoms.info for atoms in sampled_atoms):
             logging.error("MACE calculations failed for some or all configurations.")
             return
 
         logging.info("Successfully computed energies and forces with MACE.")
+
+        return sampled_atoms
 
     def calculate_std_dev(self, sampled_atoms):
         """
@@ -191,8 +193,8 @@ class ActiveLearning:
         filtered_std_dev = []
 
         for i, norm_dev in enumerate(std_dev):
-            if lower_threshold <= norm_dev <= upper_threshold:  # Include structures within the threshold range
-                filtered_atoms_list.append(sampled_atoms[0][i])
+            if self.lower_threshold <= norm_dev <= self.upper_threshold:  # Include structures within the threshold range
+                filtered_atoms_list.append(sampled_atoms[i])
                 filtered_std_dev.append(norm_dev)
         logging.info(f"Number of structures within threshold range: {len(filtered_atoms_list)}")
         return filtered_atoms_list
@@ -214,24 +216,18 @@ class ActiveLearning:
         plt.grid(True)
         plt.show()
 
-    def generate_dft_inputs(self):
-        """Writes DFT input files for filtered structures."""
-        if not self.dft_software:
-            logging.warning("No DFT software specified. Skipping input file generation.")
-            return
+    def generate_dft_inputs(self, atoms_list):
+        """
+        Generate DFT input files for ORCA or QE based on `self.dft_software`.
 
-        dft_generator = dft_input(self.output_dir)
+        Parameters:
+        - atoms_list (list): List of ASE Atoms objects.
 
-        for idx, atoms in enumerate(self.filtered_atoms_list):
-            structure_output_dir = os.path.join(self.output_dir, f"structure_{idx}")
-            os.makedirs(structure_output_dir, exist_ok=True)
-
-            if self.dft_software.lower() == 'qe':
-                dft_generator.write_qe_input(atoms, structure_output_dir)
-            elif self.dft_software.lower() == 'orca':
-                dft_generator.write_orca_input(atoms, template='orca_template.inp', filename="orca_input.inp")
-            else:
-                logging.error(f"Unsupported DFT software: {self.dft_software}")
+        Returns:
+        - input_files (list): List of generated input file paths.
+        """
+        dft_input = DFTInputGenerator(output_dir="DFT_inputs", dft_software=self.dft_software)
+        return dft_input.generate_dft_inputs(atoms_list)
 
     def run(self):
         """Executes the entire Active Learning pipeline."""
@@ -239,7 +235,7 @@ class ActiveLearning:
         sampled_atoms = self.calculate_energies_forces(sampled_atoms)
         std_dev, std_dev_forces = self.calculate_std_dev(sampled_atoms)
         filtered_atoms_list = self.filter_high_deviation_structures(std_dev,std_dev_forces,sampled_atoms)
-        
+        self.generate_dft_inputs(filtered_atoms_list)
         #TODO self.generate_dft_inputs()
         #TODO submit dft_inputs
         #TODO parse dft_inputs
