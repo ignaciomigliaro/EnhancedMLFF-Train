@@ -24,6 +24,7 @@ class ActiveLearning:
         self.calculator = args.calculator  # MACE or another DFT calculator
         self.output_dir = args.output_dir
         self.dft_software = args.dft_software
+        self.template_dir = args.template_dir if self.dft_software.lower() == "orca" else None
         self.eval_criteria = args.eval_criteria
         self.upper_threshold = args.upper_threshold
         self.lower_threshold = args.lower_threshold
@@ -226,7 +227,11 @@ class ActiveLearning:
         Returns:
         - input_files (list): List of generated input file paths.
         """
-        dft_input = DFTInputGenerator(output_dir="DFT_inputs", dft_software=self.dft_software)
+        dft_input = DFTInputGenerator(
+        output_dir="DFT_inputs", 
+        dft_software=self.dft_software, 
+        template_dir=self.template_dir  # Pass template directory
+    )
         return dft_input.generate_dft_inputs(atoms_list)
 
     def run(self):

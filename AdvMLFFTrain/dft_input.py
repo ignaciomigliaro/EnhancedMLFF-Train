@@ -5,7 +5,7 @@ from ase.io import write
 class DFTInputGenerator:
     """Generates DFT input files for ORCA and Quantum ESPRESSO (QE)."""
 
-    def __init__(self, output_dir, dft_software):
+    def __init__(self, output_dir, dft_software,template_dir="templates"):
         """
         Initializes the DFTInputGenerator.
 
@@ -15,6 +15,7 @@ class DFTInputGenerator:
         """
         self.output_dir = output_dir
         self.dft_software = dft_software.lower()  # Ensure case insensitivity
+        self.template_dir = template_dir  # Set template directory
         os.makedirs(self.output_dir, exist_ok=True)
 
     def generate_dft_inputs(self, atoms_list):
@@ -28,7 +29,7 @@ class DFTInputGenerator:
         - input_files (list): List of generated input file paths.
         """
         if self.dft_software == "orca":
-            template = os.path.join("templates", "orca_template.inp")
+            template = os.path.join(self.template_dir, "orca_template.inp")
             return self._write_orca_files(atoms_list, template)
         elif self.dft_software == "qe":
             return self._write_qe_files(atoms_list)
