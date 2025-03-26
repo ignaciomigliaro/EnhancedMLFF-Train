@@ -234,6 +234,7 @@ class ActiveLearning:
     )
         return dft_input.generate_dft_inputs(atoms_list)
 
+    
     def run(self):
         """Executes the entire Active Learning pipeline."""
         sampled_atoms, remaining_atoms = self.load_data()
@@ -241,7 +242,6 @@ class ActiveLearning:
         std_dev, std_dev_forces = self.calculate_std_dev(sampled_atoms)
         filtered_atoms_list = self.filter_high_deviation_structures(std_dev,std_dev_forces,sampled_atoms)
         self.generate_dft_inputs(filtered_atoms_list)
-        #TODO self.generate_dft_inputs()
         #TODO submit dft_inputs
         #TODO parse dft_inputs
         #TODO retrain mlff
