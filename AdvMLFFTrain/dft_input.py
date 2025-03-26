@@ -5,17 +5,37 @@ from ase.io import write
 class DFTInputGenerator:
     """Generates DFT input files for ORCA and Quantum ESPRESSO (QE)."""
 
-    def __init__(self, output_dir):
+    def __init__(self, output_dir, dft_software):
         """
         Initializes the DFTInputGenerator.
 
         Parameters:
         - output_dir (str): Directory where input files will be saved.
+        - dft_software (str): Specifies whether to generate ORCA or QE inputs.
         """
         self.output_dir = output_dir
+        self.dft_software = dft_software.lower()  # Ensure case insensitivity
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def write_orca_files(self, atoms_list, template):
+    def generate_dft_inputs(self, atoms_list):
+        """
+        Automatically generates the appropriate DFT input files based on `self.dft_software`.
+
+        Parameters:
+        - atoms_list (list): List of ASE Atoms objects.
+
+        Returns:
+        - input_files (list): List of generated input file paths.
+        """
+        if self.dft_software == "orca":
+            template = os.path.join("templates", "orca_template.inp")
+            return self._write_orca_files(atoms_list, template)
+        elif self.dft_software == "qe":
+            return self._write_qe_files(atoms_list)
+        else:
+            raise ValueError(f"Unsupported DFT software: {self.dft_software}")
+
+    def _write_orca_files(self, atoms_list, template):
         """
         Generates ORCA input files from a list of ASE Atoms objects.
 
@@ -25,7 +45,6 @@ class DFTInputGenerator:
 
         Returns:
             input_files (list): List of generated ORCA input file paths.
-            xyz_files (list): List of generated XYZ file paths.
         """
         input_files = []
         xyz_files = []
@@ -55,9 +74,9 @@ class DFTInputGenerator:
             input_files.append(input_file)
             logging.info(f"Created {input_file} referencing {xyz_file}")
 
-        return input_files, xyz_files
+        return input_files
 
-    def write_qe_files(self, atoms_list):
+    def _write_qe_files(self, atoms_list):
         """
         Generates Quantum ESPRESSO input files from a list of ASE Atoms objects.
 
@@ -73,17 +92,13 @@ class DFTInputGenerator:
             "pseudo_dir": "~/QE/pseudo",
             "outdir": "./out/",
             "verbosity": "high",
-            "etot_conv_thr": 1.0e-03,
             "tstress": True,
             "tprnfor": True,
-            "degauss": 1.4699723600e-02,
             "ecutrho": 600,
             "ecutwfc": 90,
             "vdw_corr": "mbd",
             "occupations": "smearing",
             "smearing": "cold",
-            "electron_maxstep": 80,
-            "mixing_beta": 4.0e-01,
         }
         
         pseudos = {
