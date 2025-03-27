@@ -3,6 +3,8 @@ import logging
 from ase.io import write
 from sklearn.model_selection import train_test_split
 from AdvMLFFTrain.file_submit import Filesubmit  # adjust path if needed
+import yaml
+import subprocess
 
 class MLFFTrain:
     """
@@ -10,7 +12,7 @@ class MLFFTrain:
     Currently supports MACE.
     """
 
-    def __init__(self, atoms_list, method="mace", output_dir="models"):
+    def __init__(self, atoms_list, method="mace", output_dir="models",template_dir="templates"):
         """
         Parameters:
         - atoms_list (list of ASE Atoms): Training structures
@@ -20,6 +22,7 @@ class MLFFTrain:
         self.atoms_list = atoms_list
         self.method = method.lower()
         self.output_dir = output_dir
+        self.template_dir = template_dir
         os.makedirs(self.output_dir, exist_ok=True)
 
     def prepare_and_submit_mlff(self):
@@ -47,9 +50,10 @@ class MLFFTrain:
         train_file = os.path.join(self.output_dir, "train.xyz")
         test_file = os.path.join(self.output_dir, "test.xyz")
 
-        write(train_file, train_data, format="extxyz")
-        write(test_file, test_data, format="extxyz")
-
+        logging.info(f"Writing Train data in {train_file}")
+        write(train_file, train_data)
+        logging.info(f"Writing Test data in {train_file}")
+        write(test_file, test_data)
         return {"train_file": train_file, "test_file": test_file}
     
     def create_mace_yaml(self, yaml_filename="mace_input.yaml", model_name="mace_model"):
@@ -65,7 +69,7 @@ class MLFFTrain:
         - str: Path to the created YAML config file.
         """
         yaml_path = os.path.join(self.template_dir, yaml_filename)
-        
+        logging.info(f"Creating YAML file in {yaml_path}.")
         config = {
             "name": model_name,
             "model_dir": self.output_dir,
