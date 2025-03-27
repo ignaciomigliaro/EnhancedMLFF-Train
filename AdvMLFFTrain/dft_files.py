@@ -184,8 +184,53 @@ class DFTInputGenerator:
             file.write(slurm_content)
 
         logging.info(f"Created SLURM script: {output_path}")
+   
+class DFTOutputParser:
+    """
+    Parses output files from ORCA and Quantum ESPRESSO (QE).
+    Extracts energy, forces, and final structure.
+    """
 
-    def parse_orca_to_ase(file_path):
+    def __init__(self):
+        """
+        Initializes the DFTOutputParser.
+
+        Parameters:
+        - output_dir (str): Directory where output files are located.
+        - dft_software (str): Either 'orca' or 'qe'.
+        """
+        self.output_dir = self.output_dir
+        self.dft_software = self.dft_software.lower()
+
+    def parse_outputs(self):
+        """
+        Parses all output files in the directory based on DFT software.
+
+        Returns:
+        - results (list of dict): Each dict contains 'filename', 'energy', 'forces', and 'atoms'.
+        """
+        results = []
+
+        if self.dft_software == "orca":
+            for file in os.listdir(self.output_dir):
+                if file.endswith(".out"):
+                    result = self._parse_orca_output(os.path.join(self.output_dir, file))
+                    if result:
+                        results.append(result)
+
+        elif self.dft_software == "qe":
+            for file in os.listdir(self.output_dir):
+                if file.endswith(".out") or file.endswith(".pw.out"):
+                    result = self._parse_qe_output(os.path.join(self.output_dir, file))
+                    if result:
+                        results.append(result)
+
+        else:
+            raise ValueError(f"Unsupported DFT software: {self.dft_software}")
+
+        return results
+
+    def _parse_orca_to_ase(file_path):
         """
         Parses an ORCA output file and returns an ASE Atoms object with:
         - Atomic symbols
@@ -280,3 +325,21 @@ class DFTInputGenerator:
                 print(f"Warning: No forces extracted or mismatch in count for {file_path}")
 
             return atoms
+
+    def _parse_qe_output(self, filepath):
+        """
+        Parses a single QE output file using ASE's read function.
+
+        Returns:
+        - dict: Parsed data with energy, forces, and ASE Atoms object.
+        """
+        try:
+            atoms = read(filepath, format="espresso-out")
+            energy = atoms.get_potential_energy()
+            forces = atoms.get_forces()
+
+            return atoms
+
+        except Exception as e:
+            logging.warning(f"Failed to parse QE output {filepath}: {e}")
+            return None

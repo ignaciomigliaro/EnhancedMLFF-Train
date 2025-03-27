@@ -2,7 +2,8 @@ import logging
 import torch
 from AdvMLFFTrain.mace_calc import MaceCalc
 from AdvMLFFTrain.dft_files import DFTInputGenerator
-from AdvMLFFTrain.utils import get_configurations, parse_orca_to_ase
+from AdvMLFFTrain.dft_files import DFTOutputParser
+from AdvMLFFTrain.utils import get_configurations
 import os
 import matplotlib.pyplot as plt
 import numpy as np
@@ -244,7 +245,16 @@ class ActiveLearning:
         finally:
             os.chdir(cwd)  # Restore original working directory
 
+    def parse_outputs(self):
+        """
+        Parses DFT output files based on selected DFT software.
 
+        Returns:
+        - List of parsed results (each as dict with atoms, energy, etc.)
+        """
+        parser = DFTOutputParser(output_dir=self.output_dir, dft_software=self.dft_software)
+        return parser.parse_outputs()
+    
     def run(self):
         """Executes the entire Active Learning pipeline."""
         sampled_atoms, remaining_atoms = self.load_data()
