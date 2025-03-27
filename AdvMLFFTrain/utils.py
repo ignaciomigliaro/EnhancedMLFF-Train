@@ -3,7 +3,6 @@ import os
 import logging
 from ase.io import read
 import numpy as np 
-from ase import Atoms
 import random
 
 def parse_args():

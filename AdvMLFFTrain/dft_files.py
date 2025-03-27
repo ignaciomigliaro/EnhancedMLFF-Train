@@ -1,6 +1,8 @@
 import os
 import logging
 from ase.io import write
+import numpy as np 
+from ase import Atoms
 
 class DFTInputGenerator:
     """Generates DFT input files for ORCA and Quantum ESPRESSO (QE)."""
@@ -191,7 +193,7 @@ class DFTOutputParser:
     Extracts energy, forces, and final structure.
     """
 
-    def __init__(self):
+    def __init__(self,output_dir,dft_software):
         """
         Initializes the DFTOutputParser.
 
@@ -199,8 +201,8 @@ class DFTOutputParser:
         - output_dir (str): Directory where output files are located.
         - dft_software (str): Either 'orca' or 'qe'.
         """
-        self.output_dir = self.output_dir
-        self.dft_software = self.dft_software.lower()
+        self.output_dir = output_dir
+        self.dft_software = dft_software.lower()
 
     def parse_outputs(self):
         """
@@ -218,7 +220,7 @@ class DFTOutputParser:
 
                 try:
                     if self.dft_software == "orca":
-                        result = self._parse_orca_output(full_path)
+                        result = self._parse_orca_to_ase(full_path)
                     elif self.dft_software == "qe":
                         result = self._parse_qe_output(full_path)
                     else:
@@ -232,7 +234,7 @@ class DFTOutputParser:
 
         return results
 
-    def _parse_orca_to_ase(file_path):
+    def _parse_orca_to_ase(self,file_path):
         """
         Parses an ORCA output file and returns an ASE Atoms object with:
         - Atomic symbols
@@ -306,9 +308,7 @@ class DFTOutputParser:
             # Convert lists to numpy arrays, ensuring they are never None
             positions = np.array(positions) if positions else np.array([])
             forces = np.array(forces) * 51.422 if forces else np.array([])  # Convert Hartree/Bohr to eV/Å
-            # Debugging print: Check lengths
-            print(f"Positions: {len(positions) if positions.size else 0} | Forces: {len(forces) if forces.size else 0}")
-
+           
             # Validate if element and position lists are the same length
             if len(elements) != len(positions):
                 raise ValueError(f"Mismatch in element count ({len(elements)}) and position count ({len(positions)}).")
