@@ -263,7 +263,7 @@ class ActiveLearning:
         filtered_atoms_list = self.filter_high_deviation_structures(std_dev,std_dev_forces,sampled_atoms)
         self.generate_dft_inputs(filtered_atoms_list)
         self.launch_dft_calcs()
-        #TODO parse dft_inputs
+        new_atoms = self.parse_outputs()
         #TODO retrain mlff
         #TODO re-run
         logging.info("Active Learning process completed.")
