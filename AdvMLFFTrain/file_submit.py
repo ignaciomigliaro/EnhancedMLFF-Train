@@ -62,7 +62,14 @@ class Filesubmit:
         - max_concurrent (int): Max number of jobs allowed in the queue at once.
         - sleep_interval (int): Time (seconds) to wait between queue checks.
         """
+        logging.info(f"Looking for SLURM scripts in: {self.job_dir}")
         scripts_to_submit = self._find_slurm_scripts()
+        logging.info(f"Found {len(scripts_to_submit)} SLURM scripts to submit.")
+
+        if not scripts_to_submit:
+            logging.warning("No SLURM job scripts found. Nothing to submit.")
+            return
+
         submitted_job_ids = []
 
         for script in scripts_to_submit:
@@ -79,7 +86,6 @@ class Filesubmit:
                     )
                     time.sleep(sleep_interval)
 
-        # Final monitoring loop until all submitted jobs are complete
         logging.info("All jobs submitted. Monitoring until completion...")
         while True:
             active = self._get_running_job_ids()
@@ -88,5 +94,5 @@ class Filesubmit:
                 logging.info(f"Jobs still running: {', '.join(still_running)}")
                 time.sleep(sleep_interval)
             else:
-                logging.info("All submitted jobs have completed.")
+                logging.info("✅ All submitted jobs have completed.")
                 break

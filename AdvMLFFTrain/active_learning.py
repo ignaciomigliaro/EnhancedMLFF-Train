@@ -7,7 +7,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
-from filesubmit import Filesubmit
+from AdvMLFFTrain.file_submit import Filesubmit
 
 class ActiveLearning:
     """Handles the active learning pipeline for MACE MLFF models."""
@@ -217,32 +217,32 @@ class ActiveLearning:
         plt.show()
 
     def generate_dft_inputs(self, atoms_list):
-        """
-        Generate DFT input files for ORCA or QE based on `self.dft_software`.
+            """
+            Generate DFT input files for ORCA or QE and return the output directory.
+            """
+            dft_input = DFTInputGenerator(
+                output_dir="DFT_inputs", 
+                dft_software=self.dft_software, 
+                template_dir=self.template_dir
+            )
+            dft_input.generate_dft_inputs(atoms_list)
+            return "DFT_inputs"
 
-        Parameters:
-        - atoms_list (list): List of ASE Atoms objects.
-
-        Returns:
-        - input_files (list): List of generated input file paths.
-        """
-        dft_input = DFTInputGenerator(
-        output_dir="DFT_inputs", 
-        dft_software=self.dft_software, 
-        template_dir=self.template_dir  # Pass template directory
-    )
-        return dft_input.generate_dft_inputs(atoms_list)
-
-    def launch_dft_calcs(self):
+    def launch_dft_calcs(self, dft_input_dir):
         """
         Launch DFT calculations using the generated input files.
-
-        Parameters:
-        - input_files (list): List of input file paths.
         """
-        # Launch DFT calculations using the generated input files
-        submitter = Filesubmit(self.job_dir)
-        submitter.run_all_jobs(max_concurrent=15)
+        logging.info(f"Launching calculations in {dft_input_dir}")
+        
+        # Temporarily change to input directory
+        cwd = os.getcwd()
+        os.chdir(dft_input_dir)
+
+        try:
+            submitter = Filesubmit(job_dir=".")
+            submitter.run_all_jobs(max_concurrent=15)
+        finally:
+            os.chdir(cwd)  # Restore original working directory
 
     def run(self):
         """Executes the entire Active Learning pipeline."""
@@ -250,8 +250,8 @@ class ActiveLearning:
         sampled_atoms = self.calculate_energies_forces(sampled_atoms)
         std_dev, std_dev_forces = self.calculate_std_dev(sampled_atoms)
         filtered_atoms_list = self.filter_high_deviation_structures(std_dev,std_dev_forces,sampled_atoms)
-        self.generate_dft_inputs(filtered_atoms_list)
-        self.launch_dft_calcs()
+        dft_input_dir = self.generate_dft_inputs(filtered_atoms_list)
+        self.launch_dft_calcs(dft_input_dir)
         #TODO parse dft_inputs
         #TODO retrain mlff
         #TODO re-run
