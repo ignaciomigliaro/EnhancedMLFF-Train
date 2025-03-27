@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 from AdvMLFFTrain.file_submit import Filesubmit
-from AdvMLFFTrain.utils import parse_orca_to_ase
 
 class ActiveLearning:
     """Handles the active learning pipeline for MACE MLFF models."""
