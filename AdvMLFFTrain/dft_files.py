@@ -204,29 +204,31 @@ class DFTOutputParser:
 
     def parse_outputs(self):
         """
-        Parses all output files in the directory based on DFT software.
+        Parses all DFT output files in the directory (excluding SLURM and non-.out files).
+        Gracefully handles errors in file parsing.
 
         Returns:
         - results (list of dict): Each dict contains 'filename', 'energy', 'forces', and 'atoms'.
         """
         results = []
 
-        if self.dft_software == "orca":
-            for file in os.listdir(self.output_dir):
-                if file.endswith(".out"):
-                    result = self._parse_orca_output(os.path.join(self.output_dir, file))
+        for file in os.listdir(self.output_dir):
+            if file.endswith(".out") and not file.startswith("slurm") and not file.endswith(".pw.out"):
+                full_path = os.path.join(self.output_dir, file)
+
+                try:
+                    if self.dft_software == "orca":
+                        result = self._parse_orca_output(full_path)
+                    elif self.dft_software == "qe":
+                        result = self._parse_qe_output(full_path)
+                    else:
+                        raise ValueError(f"Unsupported DFT software: {self.dft_software}")
+
                     if result:
                         results.append(result)
 
-        elif self.dft_software == "qe":
-            for file in os.listdir(self.output_dir):
-                if file.endswith(".out") or file.endswith(".pw.out"):
-                    result = self._parse_qe_output(os.path.join(self.output_dir, file))
-                    if result:
-                        results.append(result)
-
-        else:
-            raise ValueError(f"Unsupported DFT software: {self.dft_software}")
+                except Exception as e:
+                    logging.warning(f"Failed to parse {file}: {e}")
 
         return results
 
