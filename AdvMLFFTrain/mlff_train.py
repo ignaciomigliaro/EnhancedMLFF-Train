@@ -31,8 +31,11 @@ class MLFFTrain:
         Dispatches logic based on selected MLFF method.
         """
         if self.method == "mace":
-            train_file, test_file = self._write_mace_xyz_split()
-            yaml_file = self.create_mace_yaml(train_file, test_file)
+            files = self._write_mace_xyz_split()
+            yaml_file = self.create_mace_yaml(
+                train_file=files["train_file"],
+                test_file=files["test_file"]
+            )
             self.submit_training_job(yaml_file)
         else:
             raise NotImplementedError(f"MLFF method '{self.method}' is not implemented yet.")
@@ -52,11 +55,11 @@ class MLFFTrain:
 
         logging.info(f"Writing Train data in {train_file}")
         write(train_file, train_data)
-        logging.info(f"Writing Test data in {train_file}")
+        logging.info(f"Writing Test data in {test_file}")
         write(test_file, test_data)
         return {"train_file": train_file, "test_file": test_file}
     
-    def create_mace_yaml(self, yaml_filename="mace_input.yaml", model_name="mace_model"):
+    def create_mace_yaml(self, train_file, test_file, yaml_filename="mace_input.yaml", model_name="mace_model"):
         """
         Creates a new MACE YAML configuration in the template_dir,
         pointing to the train/test files in output_dir.
@@ -97,7 +100,8 @@ class MLFFTrain:
 
     def submit_training_job(self, yaml_path, slurm_name="mlff_train.slurm"):
         """
-        Submit SLURM job using the given YAML and SLURM script from template_dir.
+        Submit SLURM job using the YAML config and SLURM script from template_dir.
+        Assumes SLURM script is already properly written to use the YAML.
         """
         slurm_script_path = os.path.join(self.template_dir, slurm_name)
 
@@ -108,19 +112,15 @@ class MLFFTrain:
             logging.error(f"SLURM script not found: {slurm_script_path}")
             return None
 
-        dest_slurm = os.path.join(self.output_dir, slurm_name)
-        if not os.path.exists(dest_slurm):
-            import shutil
-            shutil.copy(slurm_script_path, dest_slurm)
-
-        logging.info(f"Submitting SLURM job using: {dest_slurm}")
+        logging.info(f"Submitting SLURM job: {slurm_script_path}")
         try:
-            result = subprocess.run(["sbatch", dest_slurm], check=True, capture_output=True, text=True)
+            result = subprocess.run(["sbatch", slurm_script_path], check=True, capture_output=True, text=True)
             job_id = result.stdout.strip().split()[-1]
-            logging.info(f"SLURM job submitted: {job_id}")
+            logging.info(f"SLURM job submitted: Job ID {job_id}")
             return job_id
         except subprocess.CalledProcessError as e:
             logging.error(f"Failed to submit SLURM job: {e.stderr}")
             return None
+
 
     
