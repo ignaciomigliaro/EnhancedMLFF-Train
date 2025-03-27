@@ -1,13 +1,14 @@
 import logging
 import torch
 from AdvMLFFTrain.mace_calc import MaceCalc
-from AdvMLFFTrain.dft_input import DFTInputGenerator
+from AdvMLFFTrain.dft_files import DFTInputGenerator
 from AdvMLFFTrain.utils import get_configurations, parse_orca_to_ase
 import os
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 from AdvMLFFTrain.file_submit import Filesubmit
+from AdvMLFFTrain.utils import parse_orca_to_ase
 
 class ActiveLearning:
     """Handles the active learning pipeline for MACE MLFF models."""
@@ -221,22 +222,21 @@ class ActiveLearning:
             Generate DFT input files for ORCA or QE and return the output directory.
             """
             dft_input = DFTInputGenerator(
-                output_dir="DFT_inputs", 
+                output_dir=self.output_dir, 
                 dft_software=self.dft_software, 
                 template_dir=self.template_dir
             )
             dft_input.generate_dft_inputs(atoms_list)
-            return "DFT_inputs"
 
-    def launch_dft_calcs(self, dft_input_dir):
+    def launch_dft_calcs(self):
         """
         Launch DFT calculations using the generated input files.
         """
-        logging.info(f"Launching calculations in {dft_input_dir}")
+        logging.info(f"Launching calculations in {self.output_dir}")
         
         # Temporarily change to input directory
         cwd = os.getcwd()
-        os.chdir(dft_input_dir)
+        os.chdir(self.output_dir)
 
         try:
             submitter = Filesubmit(job_dir=".")
@@ -244,14 +244,15 @@ class ActiveLearning:
         finally:
             os.chdir(cwd)  # Restore original working directory
 
+
     def run(self):
         """Executes the entire Active Learning pipeline."""
         sampled_atoms, remaining_atoms = self.load_data()
         sampled_atoms = self.calculate_energies_forces(sampled_atoms)
         std_dev, std_dev_forces = self.calculate_std_dev(sampled_atoms)
         filtered_atoms_list = self.filter_high_deviation_structures(std_dev,std_dev_forces,sampled_atoms)
-        dft_input_dir = self.generate_dft_inputs(filtered_atoms_list)
-        self.launch_dft_calcs(dft_input_dir)
+        self.generate_dft_inputs(filtered_atoms_list)
+        self.launch_dft_calcs()
         #TODO parse dft_inputs
         #TODO retrain mlff
         #TODO re-run
