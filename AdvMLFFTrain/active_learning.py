@@ -2,13 +2,13 @@ import logging
 import torch
 from AdvMLFFTrain.mace_calc import MaceCalc
 from AdvMLFFTrain.dft_files import DFTInputGenerator
-from AdvMLFFTrain.utils import get_configurations, parse_orca_to_ase
+from AdvMLFFTrain.dft_files import DFTOutputParser
+from AdvMLFFTrain.utils import get_configurations
 import os
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 from AdvMLFFTrain.file_submit import Filesubmit
-from AdvMLFFTrain.utils import parse_orca_to_ase
 
 class ActiveLearning:
     """Handles the active learning pipeline for MACE MLFF models."""
@@ -32,6 +32,8 @@ class ActiveLearning:
         self.use_cache = args.use_cache
         self.plot_std_dev = args.plot_std_dev
         self.sample_percentage = args.sample_percentage
+        self.training_data = args.training_data_dir
+
         os.makedirs(self.output_dir, exist_ok=True)
 
         logging.info(f"Using calculator: {self.calculator}")
@@ -45,7 +47,6 @@ class ActiveLearning:
         # **Initialize MACE calculator if selected**
         if self.calculator.lower() == "mace":
             self.mace_calc = MaceCalc(self.args.model_dir, self.device)
-
             # **Explicitly check models in model_dir**
             if not os.path.isdir(self.args.model_dir):
                 raise ValueError(f"Model directory {self.args.model_dir} does not exist.")
@@ -244,7 +245,24 @@ class ActiveLearning:
         finally:
             os.chdir(cwd)  # Restore original working directory
 
+    def parse_outputs(self):
+        """
+        Parses DFT output files based on selected DFT software.
 
+        Returns:
+        - List of parsed results (each as dict with atoms, energy, etc.)
+        """
+        parser = DFTOutputParser(output_dir=self.output_dir, dft_software=self.dft_software)
+        return parser.parse_outputs()
+    
+    def parse_training_data(self):
+        """
+        Parses the previous training data outputs on the selected DFT software
+        """
+        parser = DFTOutputParser(output_dir=self.training_data, dft_software=self.dft_software)
+        return parser.parse_outputs()
+
+    
     def run(self):
         """Executes the entire Active Learning pipeline."""
         sampled_atoms, remaining_atoms = self.load_data()
@@ -253,7 +271,9 @@ class ActiveLearning:
         filtered_atoms_list = self.filter_high_deviation_structures(std_dev,std_dev_forces,sampled_atoms)
         self.generate_dft_inputs(filtered_atoms_list)
         self.launch_dft_calcs()
-        #TODO parse dft_inputs
+        new_atoms = self.parse_outputs()
+        training_atoms = self.parse_training_data()
+        all_atoms = new_atoms + training_atoms
         #TODO retrain mlff
         #TODO re-run
         logging.info("Active Learning process completed.")
