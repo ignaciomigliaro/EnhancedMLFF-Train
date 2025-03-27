@@ -32,6 +32,8 @@ class ActiveLearning:
         self.use_cache = args.use_cache
         self.plot_std_dev = args.plot_std_dev
         self.sample_percentage = args.sample_percentage
+        self.training_data = args.training_data_dir
+
         os.makedirs(self.output_dir, exist_ok=True)
 
         logging.info(f"Using calculator: {self.calculator}")
@@ -45,7 +47,6 @@ class ActiveLearning:
         # **Initialize MACE calculator if selected**
         if self.calculator.lower() == "mace":
             self.mace_calc = MaceCalc(self.args.model_dir, self.device)
-
             # **Explicitly check models in model_dir**
             if not os.path.isdir(self.args.model_dir):
                 raise ValueError(f"Model directory {self.args.model_dir} does not exist.")
@@ -254,6 +255,14 @@ class ActiveLearning:
         parser = DFTOutputParser(output_dir=self.output_dir, dft_software=self.dft_software)
         return parser.parse_outputs()
     
+    def parse_training_data(self):
+        """
+        Parses the previous training data outputs on the selected DFT software
+        """
+        parser = DFTOutputParser(output_dir=self.training_data, dft_software=self.dft_software)
+        return parser.parse_outputs()
+
+    
     def run(self):
         """Executes the entire Active Learning pipeline."""
         sampled_atoms, remaining_atoms = self.load_data()
@@ -263,6 +272,8 @@ class ActiveLearning:
         self.generate_dft_inputs(filtered_atoms_list)
         self.launch_dft_calcs()
         new_atoms = self.parse_outputs()
+        training_atoms = self.parse_training_data()
+        all_atoms = new_atoms + training_atoms
         #TODO retrain mlff
         #TODO re-run
         logging.info("Active Learning process completed.")
