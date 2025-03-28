@@ -36,28 +36,28 @@ class MLFFTrain:
                 train_file=files["train_file"],
                 test_file=files["test_file"]
             )
+            logging.info(f"Submitting File in {yaml_file}")
             self.submit_training_job(yaml_file)
         else:
             raise NotImplementedError(f"MLFF method '{self.method}' is not implemented yet.")
 
     def _write_mace_xyz_split(self):
         """
-        Splits and writes training/testing data for MACE inside the output_dir.
-
-        Returns:
-        - dict: {'train_file': path, 'test_file': path}
+        Writes properly formatted train/test XYZ files for MACE.
         """
         train_data, test_data = train_test_split(self.atoms_list, test_size=0.1, random_state=42)
-        logging.info(f"Total data: {len(self.atoms_list)}, Training data: {len(train_data)}, Testing data: {len(test_data)}")
+        logging.info(f"Total: {len(self.atoms_list)} | Train: {len(train_data)} | Test: {len(test_data)}")
 
         train_file = os.path.join(self.output_dir, "train.xyz")
         test_file = os.path.join(self.output_dir, "test.xyz")
 
-        logging.info(f"Writing Train data in {train_file}")
-        write(train_file, train_data)
-        logging.info(f"Writing Test data in {test_file}")
-        write(test_file, test_data)
-        return {"train_file": train_file, "test_file": test_file}
+        logging.info(f"Writing train to {train_file}")
+        write_xyz(open(train_file, 'w'), train_data)
+
+        logging.info(f"Writing test to {test_file}")
+        write_xyz(open(test_file, 'w'), test_data)
+
+    return {"train_file": train_file, "test_file": test_file}
     
     def create_mace_yaml(self, train_file, test_file, yaml_filename="mace_input.yaml", model_name="mace_model"):
         """
